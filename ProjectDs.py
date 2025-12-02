@@ -1,99 +1,92 @@
-# ===============================================================
-# Front.py — FRONTEND STREAMLIT
-# ===============================================================
-
 import streamlit as st
-import numpy as np
-import joblib
 import pandas as pd
+import joblib
+import numpy as np
 
-# ============================================================
-# LOAD MODEL, SCALER, DAN FEATURE LIST
-# ============================================================
+# -------------------------------------------
+# Load Model, Scaler, & Feature Columns
+# -------------------------------------------
 model = joblib.load("model_churn.pkl")
 scaler = joblib.load("scaler.pkl")
 feature_cols = joblib.load("feature_columns.pkl")
 
-st.title("🔍 Prediksi Customer Churn Bank")
-st.write("Masukkan data nasabah untuk memprediksi apakah nasabah berpotensi churn.")
+st.title("Customer Churn Prediction App")
+st.write("Masukkan data berikut untuk memprediksi apakah customer akan churn.")
 
-# ============================
-# FORM INPUT PENGGUNA
-# ============================
+# -------------------------------------------
+# Input User
+# -------------------------------------------
+CreditScore = st.number_input("Credit Score", min_value=300, max_value=900, value=650)
+Geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
+Gender = st.selectbox("Gender", ["Male", "Female"])
+Age = st.number_input("Age", min_value=18, max_value=100, value=40)
+Tenure = st.number_input("Tenure", min_value=0, max_value=10, value=5)
+Balance = st.number_input("Balance", min_value=0.0, format="%.2f")
+NumOfProducts = st.number_input("Num of Products", min_value=1, max_value=4, value=1)
+HasCrCard = st.selectbox("Has Credit Card?", [0, 1])
+IsActiveMember = st.selectbox("Is Active Member?", [0, 1])
+EstimatedSalary = st.number_input("Estimated Salary", min_value=0.0, format="%.2f")
 
-# Kolom input
-col1, col2 = st.columns(2)
+# -------------------------------------------
+# Membentuk DataFrame Input
+# -------------------------------------------
+data = {
+    "CreditScore": CreditScore,
+    "Geography": Geography,
+    "Gender": Gender,
+    "Age": Age,
+    "Tenure": Tenure,
+    "Balance": Balance,
+    "NumOfProducts": NumOfProducts,
+    "HasCrCard": HasCrCard,
+    "IsActiveMember": IsActiveMember,
+    "EstimatedSalary": EstimatedSalary
+}
 
-with col1:
-    CreditScore = st.number_input("Credit Score", min_value=300, max_value=900, value=650)
-    Age = st.number_input("Usia", min_value=18, max_value=100, value=40)
-    Tenure = st.number_input("Tenure (Tahun)", min_value=0, max_value=10, value=3)
-    Balance = st.number_input("Balance", min_value=0.0, value=10000.0)
-    NumOfProducts = st.selectbox("Jumlah Produk", [1, 2, 3, 4])
+input_df = pd.DataFrame([data])
 
-with col2:
-    EstimatedSalary = st.number_input("Perkiraan Gaji", min_value=0.0, value=50000.0)
-    HasCrCard = st.selectbox("Punya Credit Card?", [0, 1])
-    IsActiveMember = st.selectbox("Status Keaktifan", [0, 1])
-    Geography = st.selectbox("Lokasi", ["France", "Germany", "Spain"])
-    Gender = st.selectbox("Jenis Kelamin", ["Male", "Female"])
-    CardType = st.selectbox("Jenis Kartu", ["Blue", "Silver", "Gold", "Platinum"])
-    PointEarned = st.number_input("Point Earned", min_value=0, value=500)
+# -------------------------------------------
+# FEATURE ENGINEERING (harus sama seperti training)
+# -------------------------------------------
+input_df["TenureByAge"] = input_df["Tenure"] / input_df["Age"]
+input_df["BalanceSalaryRatio"] = input_df["Balance"] / input_df["EstimatedSalary"].replace(0, 1)
+input_df["Point Earned"] = (
+    input_df["Age"] * 2
+    + input_df["Tenure"] * 10
+    + input_df["NumOfProducts"] * 20
+    + input_df["IsActiveMember"] * 50
+)
 
-# ============================
-# FEATURE ENGINEERING
-# ============================
-BalanceSalaryRatio = Balance / EstimatedSalary if EstimatedSalary > 0 else 0
-TenureByAge = Tenure / Age if Age > 0 else 0
+# -------------------------------------------
+# One-Hot Encoding (harus match feature_columns.pkl)
+# -------------------------------------------
+input_df = pd.get_dummies(input_df)
 
-# ============================
-# BUTTON PREDIKSI
-# ============================
-if st.button("🔮 Prediksi Churn"):
-    
-    # Buat dataframe 1 baris
-    input_dict = {
-        "CreditScore": CreditScore,
-        "Age": Age,
-        "Tenure": Tenure,
-        "Balance": Balance,
-        "NumOfProducts": NumOfProducts,
-        "EstimatedSalary": EstimatedSalary,
-        "HasCrCard": HasCrCard,
-        "IsActiveMember": IsActiveMember,
-        "Point Earned": PointEarned,
-        "BalanceSalaryRatio": BalanceSalaryRatio,
-        "TenureByAge": TenureByAge,
-        # Encoding categories
-        "Geography_Germany": 1 if Geography == "Germany" else 0,
-        "Geography_Spain": 1 if Geography == "Spain" else 0,
-        "Gender_Male": 1 if Gender == "Male" else 0,
-        "Card Type_Gold": 1 if CardType == "Gold" else 0,
-        "Card Type_Platinum": 1 if CardType == "Platinum" else 0,
-        "Card Type_Silver": 1 if CardType == "Silver" else 0,
-    }
+# Tambahkan kolom yang hilang dan urutkan sesuai training
+for col in feature_cols:
+    if col not in input_df:
+        input_df[col] = 0
 
-    # Buat DataFrame sesuai urutan fitur model
-    input_df = pd.DataFrame([input_dict], columns=feature_cols)
+input_df = input_df[feature_cols]
 
-    # Scaling hanya fitur numerik yg butuh
-    numerical_cols = [
-        "CreditScore","Age","Tenure","Balance",
-        "NumOfProducts","EstimatedSalary",
-        "BalanceSalaryRatio","TenureByAge","Point Earned"
-    ]
+# -------------------------------------------
+# Scaling kolom numerik (menggunakan fitur asli scaler)
+# -------------------------------------------
+numerical_cols = list(scaler.feature_names_in_)
+input_df[numerical_cols] = scaler.transform(input_df[numerical_cols])
 
-    input_df[numerical_cols] = scaler.transform(input_df[numerical_cols])
-
-    # Prediksi
+# -------------------------------------------
+# Prediksi
+# -------------------------------------------
+if st.button("Prediksi"):
     pred = model.predict(input_df)[0]
     prob = model.predict_proba(input_df)[0][1]
 
-    # ============================
-    # OUTPUT
-    st.subheader("📌 Hasil Prediksi")
+    st.subheader("Hasil Prediksi")
     if pred == 1:
-        st.error(f"⚠️ Nasabah **berpotensi CHURN** (Probabilitas: {prob:.2f})")
+        st.error(f"⚠️ Customer kemungkinan CHURN (probabilitas: {prob:.2f})")
     else:
-        st.success(f"💚 Nasabah **TIDAK berpotensi churn** (Probabilitas: {prob:.2f})")
+        st.success(f"✅ Customer tidak churn (probabilitas: {prob:.2f})")
 
+    st.write("Detail input:")
+    st.dataframe(input_df)
