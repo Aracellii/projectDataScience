@@ -80,7 +80,7 @@ url ='https://drive.google.com/uc?id=1UgiiF9nIcgmsIoAhOaeA7hXRkzhjdqeN'
 
 df = pd.read_csv(url)
 print("\nData Frame sebelum cleaning :")
-display(df.head())
+print(df.head())
 df.info()
 
 """## 2. Data Cleaning"""
@@ -96,7 +96,7 @@ if 'Complain' in df_clean.columns:
     df_clean = df_clean.drop('Complain', axis=1)
 
 print("Data Setelah Cleaning :\n")
-display(df_clean.head())
+print(df_clean.head())
 df_clean.info()
 
 """Melihat Missing Value"""
@@ -579,240 +579,15 @@ print(f"2. Faktor kedua adalah: {feat_imp.index[1]}")
 print(f"3. Faktor ketiga adalah: {feat_imp.index[2]}")
 
 
-# Streamlit App: Bank Customer Churn Explorer + Modeling
-# Save as `app_streamlit_churn.py` and run with: `streamlit run app_streamlit_churn.py`
+import joblib
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
+# Simpan Model
+joblib.dump(rf_model, "model_churn.pkl")
 
-st.set_page_config(layout="wide", page_title="Customer Churn App")
+# Simpan Scaler
+joblib.dump(scaler, "scaler.pkl")
 
-# ---------------------- Helper functions (cached) ----------------------
-@st.cache_data
-def load_data_from_url(url: str):
-    # support Google Drive "uc?id=" link
-    try:
-        return pd.read_csv(url)
-    except Exception as e:
-        st.error(f"Gagal load data: {e}")
-        return pd.DataFrame()
+# Simpan Kolom Fitur
+joblib.dump(list(X.columns), "feature_columns.pkl")
 
-@st.cache_data
-def preprocess(df: pd.DataFrame):
-    df_clean = df.copy()
-    # drop identity columns if exist
-    for col in ['RowNumber', 'CustomerId', 'Surname']:
-        if col in df_clean.columns:
-            df_clean = df_clean.drop(col, axis=1)
-    # drop Complain if present (as in notebook)
-    if 'Complain' in df_clean.columns:
-        df_clean = df_clean.drop('Complain', axis=1)
-
-    # New features
-    if 'Balance' in df_clean.columns and 'EstimatedSalary' in df_clean.columns:
-        df_clean['BalanceSalaryRatio'] = df_clean['Balance'] / (df_clean['EstimatedSalary'] + 1e-9)
-    if 'Tenure' in df_clean.columns and 'Age' in df_clean.columns:
-        df_clean['TenureByAge'] = df_clean['Tenure'] / (df_clean['Age'] + 1e-9)
-
-    # One-hot for categorical features used in model
-    df_model = pd.get_dummies(df_clean, columns=[col for col in ['Geography','Gender','Card Type'] if col in df_clean.columns], drop_first=True)
-    return df_clean, df_model
-
-@st.cache_data
-def split_scale(df_model: pd.DataFrame, target='Exited'):
-    X = df_model.drop(target, axis=1)
-    y = df_model[target]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-    return X_train, X_test, X_train_scaled, X_test_scaled, y_train, y_test, scaler
-
-@st.cache_data
-def train_models(X_train, X_train_scaled, y_train):
-    log_model = LogisticRegression(random_state=42, max_iter=1000)
-    log_model.fit(X_train_scaled, y_train)
-
-    rf_model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
-    rf_model.fit(X_train, y_train)
-    return log_model, rf_model
-
-# ---------------------- Sidebar - Data source & options ----------------------
-st.sidebar.title("Kontrol")
-data_source = st.sidebar.radio("Pilih sumber data:", ("Upload CSV", "Google Drive URL (uc?id=)", "Use sample (included)") )
-
-if data_source == 'Upload CSV':
-    uploaded_file = st.sidebar.file_uploader("Unggah file CSV", type=['csv'])
-    if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.DataFrame()
-elif data_source == 'Google Drive URL (uc?id=)':
-    url = st.sidebar.text_input('Masukkan Google Drive URL (format: https://drive.google.com/uc?id=FILEID)')
-    if url:
-        df = load_data_from_url(url)
-    else:
-        df = pd.DataFrame()
-else:
-    # small sample constructed from commonly used churn dataset structure (fallback)
-    st.sidebar.markdown("Menggunakan sample dataset bawaan.")
-    sample_url = 'https://raw.githubusercontent.com/azharimmf/Customer-Churn-Analytics/master/data/BankChurners.csv'
-    df = load_data_from_url(sample_url)
-
-st.title("Bank Customer Churn — Explorer & Modeling")
-
-if df.empty:
-    st.info("Silakan unggah file CSV atau masukkan URL Google Drive di sidebar untuk memulai.")
-    st.stop()
-
-# Show raw data
-with st.expander("Lihat data mentah (head)"):
-    st.dataframe(df.head())
-    st.write(df.shape)
-
-# Preprocess
-df_clean, df_model = preprocess(df)
-
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.subheader("Ringkasan Data Setelah Cleaning & Feature Engineering")
-    st.dataframe(df_clean.head())
-with col2:
-    st.subheader("Statistik Deskriptif")
-    st.write(df_clean.describe().T)
-
-# ---------------------- EDA ----------------------
-st.markdown("---")
-st.header("Exploratory Data Analysis (EDA)")
-
-# Correlation heatmap
-if st.checkbox('Tampilkan heatmap korelasi'):
-    fig, ax = plt.subplots(figsize=(12, 8))
-    corr = df_model.corr()
-    sns.heatmap(corr, annot=False, cmap='coolwarm', ax=ax)
-    ax.set_title('Heatmap Korelasi')
-    st.pyplot(fig)
-
-# Distribution plots selection
-numeric_cols = df_clean.select_dtypes(include=np.number).columns.tolist()
-sel_num = st.multiselect('Pilih kolom numerik untuk plot distribusi', numeric_cols, default=numeric_cols[:4])
-if sel_num:
-    fig = plt.figure(figsize=(12, 4))
-    for i, col in enumerate(sel_num):
-        ax = fig.add_subplot(1, len(sel_num), i+1)
-        sns.histplot(df_clean[col].dropna(), kde=True, ax=ax)
-        ax.set_title(col)
-    st.pyplot(fig)
-
-# Churn counts
-st.subheader('Distribusi Churn')
-fig, ax = plt.subplots()
-sns.countplot(x=df_clean['Exited'], ax=ax)
-ax.set_xticklabels(['Non Churn','Churn'])
-st.pyplot(fig)
-
-# ---------------------- Modeling ----------------------
-st.markdown("---")
-st.header("Modeling & Evaluation")
-
-X_train, X_test, X_train_scaled, X_test_scaled, y_train, y_test, scaler = split_scale(df_model)
-log_model, rf_model = train_models(X_train, X_train_scaled, y_train)
-
-model_choice = st.selectbox('Pilih model untuk dievaluasi:', ('Logistic Regression (baseline)', 'Random Forest (main)'))
-
-if st.button('Tampilkan evaluasi model'):
-    if model_choice.startswith('Logistic'):
-        y_pred = log_model.predict(X_test_scaled)
-        y_prob = log_model.predict_proba(X_test_scaled)[:,1]
-    else:
-        y_pred = rf_model.predict(X_test)
-        y_prob = rf_model.predict_proba(X_test)[:,1]
-
-    st.subheader('Akurasi & Classification Report')
-    st.write('Akurasi:', accuracy_score(y_test, y_pred))
-    st.text(classification_report(y_test, y_pred))
-
-    # Confusion Matrix
-    fig, ax = plt.subplots()
-    cm = confusion_matrix(y_test, y_pred)
-    sns.heatmap(cm, annot=True, fmt='d', ax=ax)
-    ax.set_xlabel('Prediksi')
-    ax.set_ylabel('Aktual')
-    ax.set_title('Confusion Matrix')
-    st.pyplot(fig)
-
-    # ROC
-    fpr, tpr, _ = roc_curve(y_test, y_prob)
-    roc_auc = auc(fpr, tpr)
-    fig, ax = plt.subplots()
-    ax.plot(fpr, tpr, label=f'AUC = {roc_auc:.2f}')
-    ax.plot([0,1],[0,1],'--', alpha=0.3)
-    ax.set_xlabel('False Positive Rate')
-    ax.set_ylabel('True Positive Rate')
-    ax.set_title('ROC Curve')
-    ax.legend()
-    st.pyplot(fig)
-
-# Feature importance (Random Forest)
-if st.checkbox('Tampilkan feature importance (Random Forest)'):
-    importances = rf_model.feature_importances_
-    feat_names = X_train.columns
-    feat_imp = pd.Series(importances, index=feat_names).sort_values(ascending=True)
-    fig, ax = plt.subplots(figsize=(8, 10))
-    feat_imp.tail(15).plot(kind='barh', ax=ax)
-    ax.set_title('Feature Importance (Random Forest)')
-    st.pyplot(fig)
-
-# ---------------------- Interactive Predictions ----------------------
-st.markdown('---')
-st.header('Prediksi Interaktif')
-
-st.write('Masukkan fitur manual atau pilih baris dari dataset untuk melihat prediksi model.')
-
-use_row = st.checkbox('Pilih baris dari data (preview) untuk prediksi')
-
-if use_row:
-    idx = st.number_input('Index (0..n-1) dari dataset yang dipilih', min_value=0, max_value=max(0, len(df_model)-1), value=0)
-    input_row = df_model.drop('Exited', axis=1).iloc[[idx]]
-else:
-    # create simple manual inputs for the most important numeric features if exist
-    input_row = {}
-    for col in ['CreditScore','Age','Tenure','Balance','NumOfProducts','EstimatedSalary','BalanceSalaryRatio','TenureByAge']:
-        if col in df_model.columns:
-            input_row[col] = st.number_input(col, value=float(df_model[col].median()))
-    # for missing categorical dummies just set zeros
-    input_row = pd.DataFrame([input_row])
-    # add any missing columns with 0
-    for c in df_model.drop('Exited', axis=1).columns:
-        if c not in input_row.columns:
-            input_row[c] = 0.0
-    input_row = input_row[df_model.drop('Exited', axis=1).columns]
-
-st.subheader('Fitur untuk Prediksi')
-st.dataframe(input_row)
-
-pred_model = st.selectbox('Pilih model untuk prediksi:', ('Random Forest', 'Logistic Regression'))
-if st.button('Predict'):
-    if pred_model == 'Logistic Regression':
-        X_in = scaler.transform(input_row)
-        prob = log_model.predict_proba(X_in)[0,1]
-        pred = log_model.predict(X_in)[0]
-    else:
-        # RF expects original scaling
-        prob = rf_model.predict_proba(input_row)[0,1]
-        pred = rf_model.predict(input_row)[0]
-    st.metric('Probabilitas Churn', f"{prob:.2%}")
-    st.write('Prediksi:', 'Churn' if pred==1 else 'Non Churn')
-
-st.markdown('---')
-st.write('Catatan: Aplikasi ini meniru alur notebook Anda: cleaning, feature engineering, EDA, training baseline & RF, evaluasi, dan prediksi interaktif.')
-
-# End
+print("Export selesai! File siap diunduh.")
