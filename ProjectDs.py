@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import numpy as np
 
-# Load 
 model = joblib.load("model_churn.pkl")
 scaler = joblib.load("scaler.pkl")
 feature_cols = joblib.load("feature_columns.pkl")
@@ -11,7 +9,6 @@ feature_cols = joblib.load("feature_columns.pkl")
 st.title("Customer Churn Prediction App")
 st.write("Masukkan data berikut untuk memprediksi apakah customer akan churn.")
 
-# Input 
 CreditScore = st.number_input("Credit Score", min_value=300, max_value=900, value=650)
 Geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
 Gender = st.selectbox("Gender", ["Male", "Female"])
@@ -22,8 +19,10 @@ NumOfProducts = st.number_input("Num of Products", min_value=1, max_value=4, val
 HasCrCard = st.selectbox("Has Credit Card?", ["No", "Yes"])
 IsActiveMember = st.selectbox("Is Active Member?", ["No", "Yes"])
 EstimatedSalary = st.number_input("Estimated Salary", min_value=0.0, format="%.2f")
+SatisfactionScore = st.selectbox("Satisfaction Score", [1, 2, 3, 4, 5])
+CardType = st.selectbox("Card Type", ["Blue", "Silver", "Gold", "Platinum"])
+PointsEarned = st.number_input("Points Earned", min_value=0, max_value=20000, value=0)
 
-# Create dataframe
 data = {
     "CreditScore": CreditScore,
     "Geography": Geography,
@@ -34,38 +33,34 @@ data = {
     "NumOfProducts": NumOfProducts,
     "HasCrCard": HasCrCard,
     "IsActiveMember": IsActiveMember,
-    "EstimatedSalary": EstimatedSalary
+    "EstimatedSalary": EstimatedSalary,
+    "Satisfaction Score": SatisfactionScore,
+    "Card Type": CardType,
+    "Point Earned": PointsEarned,
 }
 
-input_df = pd.DataFrame([data])
+df = pd.DataFrame([data])
 
-# Convert 
-input_df["HasCrCard"] = input_df["HasCrCard"].map({"No": 0, "Yes": 1})
-input_df["IsActiveMember"] = input_df["IsActiveMember"].map({"No": 0, "Yes": 1})
+df["HasCrCard"] = df["HasCrCard"].map({"No": 0, "Yes": 1})
+df["IsActiveMember"] = df["IsActiveMember"].map({"No": 0, "Yes": 1})
+df["TenureByAge"] = df["Tenure"] / df["Age"]
+df["BalanceSalaryRatio"] = df["Balance"] / df["EstimatedSalary"].replace(0, 1)
 
-# Feature engineering
-input_df["TenureByAge"] = input_df["Tenure"] / input_df["Age"]
-input_df["BalanceSalaryRatio"] = input_df["Balance"] / input_df["EstimatedSalary"].replace(0, 1)
-
-# One-hot encoding
-input_df = pd.get_dummies(input_df)
+df = pd.get_dummies(df)
 
 for col in feature_cols:
-    if col not in input_df:
-        input_df[col] = 0
+    if col not in df:
+        df[col] = 0
 
-input_df = input_df[feature_cols]
+df = df[feature_cols]
 
-# Scaling 
-numerical_cols = list(scaler.feature_names_in_)
-input_df[numerical_cols] = scaler.transform(input_df[numerical_cols])
+num_cols = list(scaler.feature_names_in_)
+df[num_cols] = scaler.transform(df[num_cols])
 
-# Predict 
 if st.button("Prediksi"):
-    pred = model.predict(input_df)[0]
-    prob = model.predict_proba(input_df)[0][1]
+    pred = model.predict(df)[0]
+    prob = model.predict_proba(df)[0][1]
 
-    st.subheader("Hasil Prediksi")
     if pred == 1:
         st.error(f"⚠️ Customer kemungkinan CHURN (probabilitas: {prob:.2f})")
     else:
