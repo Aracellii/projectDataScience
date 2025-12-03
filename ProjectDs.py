@@ -3,7 +3,6 @@ import pandas as pd
 import joblib
 
 model = joblib.load("model_churn.pkl")
-scaler = joblib.load("scaler.pkl")
 feature_cols = joblib.load("feature_columns.pkl")
 
 st.title("Customer Churn Prediction App")
@@ -20,8 +19,8 @@ HasCrCard = st.selectbox("Has Credit Card?", ["No", "Yes"])
 IsActiveMember = st.selectbox("Is Active Member?", ["No", "Yes"])
 EstimatedSalary = st.number_input("Estimated Salary", min_value=0.0, format="%.2f")
 SatisfactionScore = st.selectbox("Satisfaction Score", [1, 2, 3, 4, 5])
-CardType = st.selectbox("Card Type", ["silver", "Gold", "Platinum", "Diamond"])
-PointsEarned = st.number_input("Points Earned", min_value=0, value=0)
+CardType = st.selectbox("Card Type", ["Blue", "Silver", "Gold", "Platinum"])
+PointsEarned = st.number_input("Points Earned", min_value=0, max_value=20000, value=0)
 
 data = {
     "CreditScore": CreditScore,
@@ -31,8 +30,8 @@ data = {
     "Tenure": Tenure,
     "Balance": Balance,
     "NumOfProducts": NumOfProducts,
-    "HasCrCard": HasCrCard,
-    "IsActiveMember": IsActiveMember,
+    "HasCrCard": 1 if HasCrCard == "Yes" else 0,
+    "IsActiveMember": 1 if IsActiveMember == "Yes" else 0,
     "EstimatedSalary": EstimatedSalary,
     "Satisfaction Score": SatisfactionScore,
     "Card Type": CardType,
@@ -41,10 +40,8 @@ data = {
 
 df = pd.DataFrame([data])
 
-df["HasCrCard"] = df["HasCrCard"].map({"No": 0, "Yes": 1})
-df["IsActiveMember"] = df["IsActiveMember"].map({"No": 0, "Yes": 1})
-df["TenureByAge"] = df["Tenure"] / df["Age"]
 df["BalanceSalaryRatio"] = df["Balance"] / df["EstimatedSalary"].replace(0, 1)
+df["TenureByAge"] = df["Tenure"] / df["Age"]
 
 df = pd.get_dummies(df)
 
@@ -54,13 +51,10 @@ for col in feature_cols:
 
 df = df[feature_cols]
 
-num_cols = list(scaler.feature_names_in_)
-df[num_cols] = scaler.transform(df[num_cols])
-
 if st.button("Prediksi"):
-    pred = model.predict(df)[0]
     prob = model.predict_proba(df)[0][1]
-
+    pred = model.predict(df)[0]
+    
     if pred == 1:
         st.error(f"⚠️ Customer kemungkinan CHURN (probabilitas: {prob:.2f})")
     else:
