@@ -80,7 +80,7 @@ url ='https://drive.google.com/uc?id=1UgiiF9nIcgmsIoAhOaeA7hXRkzhjdqeN'
 
 df = pd.read_csv(url)
 print("\nData Frame sebelum cleaning :")
-display(df.head())
+print(df.head())
 df.info()
 
 """## 2. Data Cleaning"""
@@ -96,7 +96,7 @@ if 'Complain' in df_clean.columns:
     df_clean = df_clean.drop('Complain', axis=1)
 
 print("Data Setelah Cleaning :\n")
-display(df_clean.head())
+print(df_clean.head())
 df_clean.info()
 
 """Melihat Missing Value"""
@@ -131,8 +131,6 @@ df_model = pd.get_dummies(df_clean, columns=['Geography', 'Gender', 'Card Type']
 numerical_features = ['CreditScore', 'Age', 'Tenure', 'Balance', 'NumOfProducts', 'EstimatedSalary']
 categorical_features = ['Geography', 'Gender', 'HasCrCard', 'IsActiveMember', 'Complain', 'Satisfaction Score', 'Card Type', 'Point Earned']
 
-print(df_model.head())
-
 """Menampilkan Heatmap"""
 
 # Hitung matriks korelasi dari dataframe final
@@ -146,7 +144,45 @@ plt.show()
 
 """## Distribusi Data Numerik"""
 
+# DISTRIBUSI FITUR NUMERIK
+true_numeric_cols = ['CreditScore', 'Age', 'Tenure', 'Balance',
+                     'NumOfProducts', 'EstimatedSalary',
+                     'BalanceSalaryRatio', 'TenureByAge',
+                     'Satisfaction Score', 'Point Earned']
 
+# Pastikan hanya ambil kolom yang benar-benar ada
+true_numeric_cols = [col for col in true_numeric_cols if col in df.columns]
+
+df[true_numeric_cols].hist(
+    figsize=(16, 12),
+    bins=30,
+    color='#3498db',
+    edgecolor='black',
+    layout=(3, 3)
+)
+
+plt.suptitle('Distribusi Fitur Numerik', fontsize=18, fontweight='bold', y=0.98)
+plt.tight_layout()
+plt.show()
+
+# DISTRIBUSI KATEGORIKAL
+fig, ax = plt.subplots(1, 4, figsize=(20, 5))
+
+sns.countplot(data=df, x='Gender', ax=ax[0], palette='Set2', order=['Male', 'Female'])
+ax[0].set_title('Distribusi Gender')
+
+sns.countplot(data=df, x='Geography', ax=ax[1], palette='Set2')
+ax[1].set_title('Distribusi Geography')
+
+sns.countplot(data=df, x='Card Type', ax=ax[2], palette='husl')
+ax[2].set_title('Distribusi Card Type')
+
+sns.countplot(data=df, x='IsActiveMember', ax=ax[3], palette='Set1')
+ax[3].set_title('Distribusi Active Member')
+ax[3].set_xticklabels(['Tidak Aktif', 'Aktif'])
+
+plt.tight_layout()
+plt.show()
 
 """Distribusi Churn"""
 
@@ -172,13 +208,7 @@ print(f'Customer Yang Tidak Churn: {not_churned_count} ({presentase_tidak_churn:
 
 """Persebaran Churn"""
 
-df_plot = df_clean.copy()
-
-df_plot['Exited'] = df_plot['Exited'].replace({0: 'Tidak Churn', 1: 'Churn'})
-
-sns.pairplot(df_plot[['CreditScore', 'Age', 'Balance', 'Exited']],
-             hue='Exited',
-             palette='husl')
+sns.pairplot(df_clean[['CreditScore', 'Age', 'Balance', 'Exited']], hue='Exited', palette='husl')
 plt.show()
 
 """Churn vs Non Churn pada Kredit Score"""
@@ -329,13 +359,14 @@ for card_type in df['Card Type'].unique():
 """
 
 # 2. Memisahkan Fitur (X) dan Target (y)
-X = df_model.drop('Exited', axis=1)
-y = df_model['Exited']
+X = df_model.drop('Exited', axis=1) # Data untuk belajar (Semua kecuali jawaban)
+y = df_model['Exited']              # Jawaban (Kunci Jawaban)
 
-# 3. Split Data
+# 3. Split Data (80% Training, 20% Testing)
+# stratify=y memastikan proporsi Churn di data latih dan uji tetap seimbang
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-# 4. Scaling
+# 4. Scaling (Standardisasi Angka)
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
@@ -346,7 +377,7 @@ print(f"Jumlah Data Uji: {X_test.shape[0]} baris")
 
 """##Modeling Logistic Regresion"""
 
-#MODELING BASELINE (LOGISTIC REGRESSION) ---
+# --- LANGKAH 5: MODELING BASELINE (LOGISTIC REGRESSION) ---
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
@@ -355,7 +386,7 @@ print("=== HASIL MODEL 1: LOGISTIC REGRESSION (BASELINE) ===")
 # Inisialisasi Model
 log_model = LogisticRegression(random_state=42)
 
-# Latih Model
+# Latih Model (Pakai data yang sudah di-scaling!)
 log_model.fit(X_train_scaled, y_train)
 
 # Prediksi Data Uji
@@ -368,20 +399,21 @@ print(classification_report(y_test, y_pred_log))
 
 """## Model Random Forest"""
 
-#MODELING UTAMA (RANDOM FOREST)
+# --- LANGKAH 6: MODELING UTAMA (RANDOM FOREST) ---
 from sklearn.ensemble import RandomForestClassifier
 
 print("=== HASIL MODEL 2: RANDOM FOREST (MAIN MODEL) ===")
 
 # Inisialisasi Model
+# class_weight='balanced' membantu model lebih peka terhadap nasabah yang Churn (minoritas)
 rf_model = RandomForestClassifier(n_estimators=100,
                                   random_state=42,
                                   class_weight='balanced')
 
-# Latih Model
+# Latih Model (Random Forest bisa pakai data asli X_train tanpa scaling)
 rf_model.fit(X_train, y_train)
 
-# Prediksi
+# Prediksi Data Uji
 y_pred_rf = rf_model.predict(X_test)
 
 # Evaluasi
@@ -391,16 +423,20 @@ print(classification_report(y_test, y_pred_rf))
 
 """### Confusion Matrix"""
 
-# VISUALISASI CONFUSION MATRIX ---
+# --- LANGKAH 7: VISUALISASI CONFUSION MATRIX ---
 from sklearn.metrics import ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
+# Siapkan kanvas (frame) gambar dengan 2 kolom (Kiri & Kanan)
 fig, ax = plt.subplots(1, 2, figsize=(14, 6))
 
-
+# 1. Plot Baseline (Logistic Regression) - Kiri
+# PENTING: LogReg pakai data yang di-SCALING (X_test_scaled)
 ConfusionMatrixDisplay.from_estimator(log_model, X_test_scaled, y_test, ax=ax[0], cmap='Blues')
 ax[0].set_title('Baseline: Logistic Regression')
 
+# 2. Plot Main Model (Random Forest) - Kanan
+# PENTING: RF pakai data ASLI (X_test) karena dia tidak butuh scaling
 ConfusionMatrixDisplay.from_estimator(rf_model, X_test, y_test, ax=ax[1], cmap='Greens')
 ax[1].set_title('Main Model: Random Forest')
 
@@ -412,13 +448,18 @@ plt.show()
 from sklearn.metrics import ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
+# Siapkan kanvas
 fig, ax = plt.subplots(1, 2, figsize=(14, 6))
 
-
+# 1. Plot Baseline (LogReg) - Pakai Scaling!
+# normalize='true' artinya: Persentase dihitung per Baris (Baris Churn & Baris Tidak Churn)
+# values_format='.1%' artinya: Tampilkan sebagai persen dengan 1 angka di belakang koma (misal 85.5%)
 ConfusionMatrixDisplay.from_estimator(log_model, X_test_scaled, y_test, ax=ax[0],
                                       cmap='Blues', normalize='pred', values_format='.1%')
 ax[0].set_title('Baseline: Logistic Regression (Dalam %)')
 
+# 2. Plot Main Model (Random Forest) - Pakai Data Asli!
+# Ubah normalize='true' menjadi normalize='pred'
 ConfusionMatrixDisplay.from_estimator(rf_model, X_test, y_test, ax=ax[1],
                                       cmap='Greens', normalize='pred', values_format='.1%')
 
@@ -428,20 +469,31 @@ fig.suptitle('Perbandingan berdasarkan Precision', fontsize=16, y=1.05)
 plt.tight_layout()
 plt.show()
 
+print("""
+CARA BACA PERSENTASE (Fokus ke Baris Bawah '1'):
+- Lihat kotak KANAN BAWAH (True Positive).
+- Jika angkanya misal 60%, artinya Model berhasil menangkap 60% dari seluruh nasabah yang benar-benar Churn.
+- Bandingkan Kiri vs Kanan. Random Forest harusnya punya persentase lebih tinggi di kotak ini.
+""")
+
 """## Recall"""
 
 from sklearn.metrics import ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
 
+# Siapkan kanvas
 fig, ax = plt.subplots(1, 2, figsize=(14, 6))
 
-
+# 1. Plot Baseline (LogReg) - Pakai Scaling!
+# normalize='true' artinya: Persentase dihitung per Baris (Baris Churn & Baris Tidak Churn)
+# values_format='.1%' artinya: Tampilkan sebagai persen dengan 1 angka di belakang koma (misal 85.5%)
 ConfusionMatrixDisplay.from_estimator(log_model, X_test_scaled, y_test, ax=ax[0],
                                       cmap='Blues', normalize='true', values_format='.1%')
 ax[0].set_title('Baseline: Logistic Regression (Dalam %)')
 
-
+# 2. Plot Main Model (Random Forest) - Pakai Data Asli!
+# Ubah normalize='true' menjadi normalize='pred'
 ConfusionMatrixDisplay.from_estimator(rf_model, X_test, y_test, ax=ax[1],
                                       cmap='Greens', normalize='true', values_format='.1%')
 
@@ -451,35 +503,43 @@ fig.suptitle('Perbandingan berdasarkan Recall', fontsize=16, y=1.05)
 plt.tight_layout()
 plt.show()
 
+print("""
+CARA BACA PERSENTASE (Fokus ke Baris Bawah '1'):
+- Lihat kotak KANAN BAWAH (True Positive).
+- Jika angkanya misal 60%, artinya Model berhasil menangkap 60% dari seluruh nasabah yang benar-benar Churn.
+- Bandingkan Kiri vs Kanan. Random Forest harusnya punya persentase lebih tinggi di kotak ini.
+""")
+
 """## ROC
 
 """
 
-#PERBANDINGAN KURVA ROC ---
+# --- LANGKAH 8: PERBANDINGAN KURVA ROC ---
 from sklearn.metrics import roc_curve, auc
 
 # 1. Hitung Probabilitas (Peluang)
-y_prob_log = log_model.predict_proba(X_test_scaled)[:, 1]
+# Model tidak cuma tebak Ya/Tidak, tapi tebak "% Kemungkinan Churn"
+y_prob_log = log_model.predict_proba(X_test_scaled)[:, 1] # Ambil peluang kelas 1 (Churn)
 y_prob_rf = rf_model.predict_proba(X_test)[:, 1]
 
-# 2. Hitung False Positive dan True Positive
+# 2. Hitung FPR (False Positive) dan TPR (True Positive)
 fpr_log, tpr_log, _ = roc_curve(y_test, y_prob_log)
 fpr_rf, tpr_rf, _ = roc_curve(y_test, y_prob_rf)
 
-# 3. Hitung Luas Area
+# 3. Hitung Luas Area (AUC Score)
 auc_log = auc(fpr_log, tpr_log)
 auc_rf = auc(fpr_rf, tpr_rf)
 
 # 4. Plotting
 plt.figure(figsize=(10, 6))
 
-# Garis Logistik
+# Garis Logistik (Putus-putus)
 plt.plot(fpr_log, tpr_log, linestyle='--', color='blue', label=f'Logistic Regression (AUC = {auc_log:.2f})')
 
-# Garis Random Forest
+# Garis Random Forest (Tebal)
 plt.plot(fpr_rf, tpr_rf, linewidth=3, color='green', label=f'Random Forest (AUC = {auc_rf:.2f})')
 
-# Garis Tebakan
+# Garis Tebakan Ngawur (50:50)
 plt.plot([0, 1], [0, 1], 'k--', alpha=0.3)
 
 plt.title('Kurva ROC: Perbandingan Model', fontsize=14)
@@ -491,18 +551,19 @@ plt.show()
 
 """## Feature Importance"""
 
-#FEATURE IMPORTANCE
+# --- LANGKAH 9: FEATURE IMPORTANCE (INSIGHT) ---
 import pandas as pd
 
 # Ambil data tingkat kepentingan fitur dari Random Forest
 importances = rf_model.feature_importances_
 feature_names = X.columns
 
-# urutkan dari yang terbesar
+# Buat Series dan urutkan dari yang terbesar
 feat_imp = pd.Series(importances, index=feature_names).sort_values(ascending=False)
 
 # Plot 10 Fitur Teratas
 plt.figure(figsize=(10, 8))
+# Pakai warna Teal biar estetik
 feat_imp.head(10).plot(kind='barh', color='#2a9d8f')
 
 plt.title('10 Faktor Utama Penyebab Nasabah Churn (Menurut Random Forest)', fontsize=14)
@@ -511,10 +572,13 @@ plt.gca().invert_yaxis() # Membalik urutan biar ranking 1 ada di atas
 plt.grid(axis='x', alpha=0.3)
 plt.show()
 
+# Print teks kesimpulan otomatis
 print("INSIGHT BISNIS:")
 print(f"1. Faktor paling dominan adalah: {feat_imp.index[0]}")
 print(f"2. Faktor kedua adalah: {feat_imp.index[1]}")
 print(f"3. Faktor ketiga adalah: {feat_imp.index[2]}")
+
+
 import joblib
 
 # Simpan Model
