@@ -3,7 +3,7 @@ import pandas as pd
 import joblib
 import numpy as np
 
-# Load model & scaler
+# Load 
 model = joblib.load("model_churn.pkl")
 scaler = joblib.load("scaler.pkl")
 feature_cols = joblib.load("feature_columns.pkl")
@@ -11,7 +11,7 @@ feature_cols = joblib.load("feature_columns.pkl")
 st.title("Customer Churn Prediction App")
 st.write("Masukkan data berikut untuk memprediksi apakah customer akan churn.")
 
-# Input fields
+# Input 
 CreditScore = st.number_input("Credit Score", min_value=300, max_value=900, value=650)
 Geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
 Gender = st.selectbox("Gender", ["Male", "Female"])
@@ -39,7 +39,7 @@ data = {
 
 input_df = pd.DataFrame([data])
 
-# Convert categorical binary
+# Convert 
 input_df["HasCrCard"] = input_df["HasCrCard"].map({"No": 0, "Yes": 1})
 input_df["IsActiveMember"] = input_df["IsActiveMember"].map({"No": 0, "Yes": 1})
 
@@ -50,7 +50,6 @@ input_df["BalanceSalaryRatio"] = input_df["Balance"] / input_df["EstimatedSalary
 # One-hot encoding
 input_df = pd.get_dummies(input_df)
 
-# Pastikan semua kolom fitur ada
 for col in feature_cols:
     if col not in input_df:
         input_df[col] = 0
