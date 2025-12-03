@@ -38,15 +38,13 @@ input_df = pd.DataFrame([data])
 
 input_df["HasCrCard"] = input_df["HasCrCard"].map({"No": 0, "Yes": 1})
 input_df["IsActiveMember"] = input_df["IsActiveMember"].map({"No": 0, "Yes": 1})
-
 input_df["TenureByAge"] = input_df["Tenure"] / input_df["Age"]
 input_df["BalanceSalaryRatio"] = input_df["Balance"] / input_df["EstimatedSalary"].replace(0, 1)
-input_df["Point Earned"] = (
-    input_df["Age"] 
-    + input_df["Tenure"] 
-    + input_df["NumOfProducts"] 
-    + input_df["IsActiveMember"] 
-)
+input_df["Age"] 
+input_df["Tenure"] 
+input_df["NumOfProducts"] 
+input_df["IsActiveMember"] 
+
 
 input_df = pd.get_dummies(input_df)
 
