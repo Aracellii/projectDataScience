@@ -3,7 +3,6 @@ import pandas as pd
 import joblib
 import numpy as np
 
-# Load Model, Scaler, & Feature Columns
 model = joblib.load("model_churn.pkl")
 scaler = joblib.load("scaler.pkl")
 feature_cols = joblib.load("feature_columns.pkl")
@@ -11,7 +10,6 @@ feature_cols = joblib.load("feature_columns.pkl")
 st.title("Customer Churn Prediction App")
 st.write("Masukkan data berikut untuk memprediksi apakah customer akan churn.")
 
-# Input User
 CreditScore = st.number_input("Credit Score", min_value=300, max_value=900, value=650)
 Geography = st.selectbox("Geography", ["France", "Spain", "Germany"])
 Gender = st.selectbox("Gender", ["Male", "Female"])
@@ -23,7 +21,6 @@ HasCrCard = st.selectbox("Has Credit Card?", ["No", "Yes"])
 IsActiveMember = st.selectbox("Is Active Member?", ["No", "Yes"])
 EstimatedSalary = st.number_input("Estimated Salary", min_value=0.0, format="%.2f")
 
-# Membentuk DataFrame Input
 data = {
     "CreditScore": CreditScore,
     "Geography": Geography,
@@ -39,17 +36,18 @@ data = {
 
 input_df = pd.DataFrame([data])
 
-# FEATURE ENGINEERING 
+input_df["HasCrCard"] = input_df["HasCrCard"].map({"No": 0, "Yes": 1})
+input_df["IsActiveMember"] = input_df["IsActiveMember"].map({"No": 0, "Yes": 1})
+
 input_df["TenureByAge"] = input_df["Tenure"] / input_df["Age"]
 input_df["BalanceSalaryRatio"] = input_df["Balance"] / input_df["EstimatedSalary"].replace(0, 1)
 input_df["Point Earned"] = (
-    input_df["Age"] * 2
-    + input_df["Tenure"] * 10
-    + input_df["NumOfProducts"] * 20
-    + input_df["IsActiveMember"] * 50
+    input_df["Age"] 
+    + input_df["Tenure"] 
+    + input_df["NumOfProducts"] 
+    + input_df["IsActiveMember"] 
 )
 
-# One-Hot Encoding 
 input_df = pd.get_dummies(input_df)
 
 for col in feature_cols:
@@ -58,12 +56,8 @@ for col in feature_cols:
 
 input_df = input_df[feature_cols]
 
-# Scaling kolom numerik 
-
 numerical_cols = list(scaler.feature_names_in_)
 input_df[numerical_cols] = scaler.transform(input_df[numerical_cols])
-
-# Prediksi
 
 if st.button("Prediksi"):
     pred = model.predict(input_df)[0]
@@ -75,5 +69,4 @@ if st.button("Prediksi"):
     else:
         st.success(f"✅ Customer tidak churn (probabilitas: {prob:.2f})")
 
-    st.write("Detail input:")
     st.dataframe(input_df)
