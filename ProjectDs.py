@@ -69,4 +69,3 @@ if st.button("Prediksi"):
     else:
         st.success(f"✅ Customer tidak churn (probabilitas: {prob:.2f})")
 
-    st.dataframe(input_df)
