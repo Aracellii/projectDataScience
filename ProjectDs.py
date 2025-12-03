@@ -20,8 +20,8 @@ HasCrCard = st.selectbox("Has Credit Card?", ["No", "Yes"])
 IsActiveMember = st.selectbox("Is Active Member?", ["No", "Yes"])
 EstimatedSalary = st.number_input("Estimated Salary", min_value=0.0, format="%.2f")
 SatisfactionScore = st.selectbox("Satisfaction Score", [1, 2, 3, 4, 5])
-CardType = st.selectbox("Card Type", ["Blue", "Silver", "Gold", "Platinum"])
-PointsEarned = st.number_input("Points Earned", min_value=0, max_value=20000, value=0)
+CardType = st.selectbox("Card Type", ["silver", "Gold", "Platinum", "Diamond"])
+PointsEarned = st.number_input("Points Earned", min_value=0, value=0)
 
 data = {
     "CreditScore": CreditScore,
